@@ -5,21 +5,28 @@
 #include <unistd.h>  // For fork() and execvp(), isatty()
 
 
-int main(){
+int main(void){
     char *line = NULL;
     size_t capacity = 0;
+    int interactive = isatty(STDIN_FILENO);
     printf("MyShell> ");
     fflush(stdout);
 
     ssize_t length = getline(&line, &capacity, stdin);
-    while(length!=-1){
-        printf("You entered: %s", line);
-        printf("MyShell> ");
-        fflush(stdout);
-        length = getline(&line, &capacity, stdin);
-        if(length==-1){
-            printf("Error reading input\n");
+    for( ; ;){
+        if(interactive){
+            printf("MyShell> ");
+            fflush(stdout);
         }
+        ssize_t length = getline(&line, &capacity, stdin);
+        if(length==-1){
+            if(ferror(stdin)) perror("MyShell: read");
+            else if(interactive) putchar('\n');
+            break;
+        }
+        if(length==1 && line[0]=='\n') continue;
+        printf("You entered: %s", line);
     }
     free(line);
+    return 0;
 }
