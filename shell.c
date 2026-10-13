@@ -4,9 +4,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>  // For pid_t
+#include <sys/wait.h>   // For waitpid()
 #include <unistd.h>  // For fork() and execvp(), isatty()
+#include <errno.h>
 
 int tokenize(char* line, char** argv);
+int lastStatus=0;
+int run_command(char** argv);
 
 int main(void){
     char *line = NULL;
@@ -27,9 +31,7 @@ int main(void){
         char* argv[MAX_ARGS];
         int argc=tokenize(line, argv);
         if(argc<=0) continue;
-        for(int i=0; i<argc; i++){
-            printf("argv[%d]: %s\n", i, argv[i]);
-        }
+        run_command(argv);
     }
     free(line);
     return 0;
@@ -54,4 +56,29 @@ int tokenize(char* line, char** argv){
     }
     argv[argc]=NULL;
     return argc;
+}
+int run_command(char** argv){
+    pid_t pid=fork();
+    if(pid<0) {
+        perror("MyShell: fork");
+        return -1;
+    }
+    if(pid==0){
+        execvp(argv[0], argv);
+        int error = errno;
+        perror(argv[0]);
+        if(error==ENOENT) _exit(127);
+        else _exit(126);
+    }
+    int status;
+    if(waitpid(pid, &status, 0)==-1){
+        perror("MyShell: waitpid");
+        return 1;
+    }
+    if(WIFEXITED(status)){
+        lastStatus=WEXITSTATUS(status);
+    } else if(WIFSIGNALED(status)){
+        lastStatus=128+WTERMSIG(status);
+    }
+return lastStatus;
 }
